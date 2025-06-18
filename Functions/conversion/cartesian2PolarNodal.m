@@ -50,9 +50,8 @@ function [r, theta, nu, R, Theta, N] = cartesian2PolarNodal(x, y, z, dx, dy, dz)
         n_hat = n_vec / n_norm; % Dirección del nodo ascendente
         m_hat = cross(h_hat, n_hat); % Perpendicular en el plano orbital
     else
-        % Caso ecuatorial: usar ejes canónicos
-        temp_vec = [h_vec(2), -h_vec(1), 0]';
-        n_hat = temp_vec / norm(temp_vec);
+        % Caso ecuatorial
+        n_hat = [1; 0; 0];
         m_hat = [0; 1; 0];
     end
     

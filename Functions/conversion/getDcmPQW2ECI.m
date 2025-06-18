@@ -23,14 +23,14 @@ R_RAAN = [cos(RAAN), -sin(RAAN), 0;
                   0,          0, 1];
 
 % Matriz de rotación alrededor del eje X por la inclinación (i)
-R_INC = [1,       0,        0;
+R_INC = [1,                0,                 0;
          0, cos(inclination), -sin(inclination);
          0, sin(inclination),  cos(inclination)];
 
 % Matriz de rotación alrededor del eje Z por el argumento del periapside (ω)
 R_u = [cos(argumentOfPeriapsis), -sin(argumentOfPeriapsis), 0;
        sin(argumentOfPeriapsis),  cos(argumentOfPeriapsis), 0;
-            0,      0, 1];
+                              0,                         0, 1];
 
 % Producto de las matrices de rotación: de ECI a PQW
 dcmI2PQW = R_RAAN * R_INC * R_u;

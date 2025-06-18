@@ -1,4 +1,4 @@
-function plotNumericError(func, funcNumeric, range, title_text, xlabel_text, ylabel_text, color)
+function plotNumericError(func, funcNumeric, range, title_text, subtitle_text, xlabel_text, ylabel_text, color)
 %% plotNumericError Representa el error entre una función exacta y su aproximación numérica.
 %
 % Esta función calcula el error punto a punto entre un vector de valores exactos
@@ -17,6 +17,7 @@ function plotNumericError(func, funcNumeric, range, title_text, xlabel_text, yla
 %
 % Entradas opcionales:
 %   title_text   : Título del gráfico (formato LaTeX) [por defecto: '']
+%   subtitle_text: Subtítulo del gráfico (formato LaTeX) [por defecto: '']
 %   xlabel_text  : Etiqueta del eje X (formato LaTeX) [por defecto: '']
 %   ylabel_text  : Etiqueta del eje Y (formato LaTeX) [por defecto: '']
 %   color        : Color o estilo de línea [por defecto: 'b']
@@ -25,13 +26,16 @@ function plotNumericError(func, funcNumeric, range, title_text, xlabel_text, yla
     if nargin < 4 || isempty(title_text)
         title_text = '';
     end
-    if nargin < 5 || isempty(xlabel_text)
+    if nargin < 5 || isempty(subtitle_text)
+        subtitle_text = '';
+    end
+    if nargin < 6 || isempty(xlabel_text)
         xlabel_text = '';
     end
-    if nargin < 6 || isempty(ylabel_text)
+    if nargin < 7 || isempty(ylabel_text)
         ylabel_text = '';
     end
-    if nargin < 7 || isempty(color)
+    if nargin < 8 || isempty(color)
         color = 'b';
     end
 
@@ -46,8 +50,10 @@ function plotNumericError(func, funcNumeric, range, title_text, xlabel_text, yla
 
     % Etiquetas y título en LaTeX
     title(title_text, 'Interpreter', 'latex');
+    subtitle(subtitle_text, 'Interpreter', 'latex', 'FontSize', 10);
     xlabel(xlabel_text, 'Interpreter', 'latex');
     ylabel(ylabel_text, 'Interpreter', 'latex');
+
 
     % Ajustar límites del eje X
     xlim([min(range), max(range)]);

@@ -1,5 +1,5 @@
-function [dXdt, dXdt_Kepler, dXdt_J2J3_I] = odeMotion(t, X0, X0I, mu, J2, J3, R, a, e, n, INC, Omega, omega, theta_0, opts)
-%% odeMotion Combina movimiento kepleriano y movimiento relativo perturbado por J2–J3.
+function [dXdt, dXdt_Kepler, dXdt_J2J3_I] = kechichianMotion(t, X0, X0I, mu, J2, J3, R, a, e, n, INC, Omega, omega, theta_0, opts)
+%% kechichianMotion Combina movimiento kepleriano y movimiento relativo perturbado por J2–J3.
 %
 % Esta función calcula la evolución temporal del estado orbital en coordenadas inerciales,
 % combinando el movimiento kepleriano del centro de masas y el movimiento relativo linealizado
