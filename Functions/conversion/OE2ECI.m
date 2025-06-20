@@ -17,20 +17,17 @@ function [posECI, velECI] = OE2ECI(mu, SMA, ECC, INC, RAAN, AOP, TA)
 %       - posECI : Vector de posición en el marco ECI [m]
 %       - velECI : Vector de velocidad en el marco ECI [m/s]
 
-% Parámetro gravitacional de la Tierra [m^3/s^2]
-pEarthMu = mu;
-
 % Calcular el semi-latus rectum (parámetro de la sección cónica)
 semilatusRectum = SMA * (1 - ECC^2);
 
 % Calcular el momento angular específico
-angularMomentum = sqrt(pEarthMu * semilatusRectum);
+angularMomentum = sqrt(mu * semilatusRectum);
 
 % Calcular el vector de posición en el marco perifocal
 perifocalPos = (semilatusRectum / (1 + ECC * cos(TA))) * [cos(TA); sin(TA); 0];
 
 % Calcular el vector de velocidad en el marco perifocal
-perifocalVel = (pEarthMu / angularMomentum) * [ECC*sin(TA); 1 + ECC*cos(TA); 0];
+perifocalVel = (mu / angularMomentum) * [ECC*sin(TA); 1 + ECC*cos(TA); 0];
 
 % Calcular la matriz de transformación del marco perifocal al ECI
 dcmPQW2ECI = getDcmPQW2ECI(INC, RAAN, AOP);
