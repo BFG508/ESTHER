@@ -21,7 +21,7 @@ INC_values = deg2rad([0, 30, 45, asind(sqrt(4/5)), 90]); % Inclinaciones    [rad
 num_a         = numel(a_values);         % Número de semiejes mayores
 num_e         = numel(e_values);         % Número de excentricidades
 num_inc       = numel(INC_values);       % Número de inclinaciones
-combinations = num_a * num_e * num_inc;  % Total de combinaciones
+combinations  = num_a * num_e * num_inc; % Total de combinaciones
 
 % Inicialización de estructuras de datos
 t_values = cell(num_a, 1);         % Cell array para vectores temporales
@@ -36,6 +36,62 @@ for ia = 1:num_a
     T_values(ia) = 2*pi/n_values(ia);         % Periodo orbital [s]
     t_values{ia} = 0:0.1:2*T_values(ia)';     % Vector temporal para cada semieje mayor
 end
+
+%% Representación de casos de estudios
+if ~exist('figuras', 'dir')
+    mkdir('figuras'); 
+end
+
+set(0, 'DefaultFigureVisible', 'on');
+
+a_km = a_values / 1e3;
+inc_deg = rad2deg(INC_values);
+
+[a_grid, inc_grid] = meshgrid(a_km, inc_deg);
+
+casos1 = reshape(1:num_a*num_inc, num_inc, num_a);
+casos2 = reshape((num_a*num_inc+1):(2*num_a*num_inc), num_inc, num_a);
+casos3 = reshape((2*num_a*num_inc+1):(3*num_a*num_inc), num_inc, num_a);
+
+casos = {casos1, casos2, casos3};
+
+figure
+sgtitle('\bf{Matriz de casos de estudios}', 'Interpreter', 'latex')
+
+for i = 1:3
+    subplot(1,3,i)
+    hold on
+    
+    scatter(a_grid(:), inc_grid(:), 40, 'filled', 'MarkerFaceColor', [0.56 0.07 0.65])
+    
+    for j = 1:numel(a_grid)
+        offset_x = range(a_km) * 0.05;
+        text(a_grid(j) + offset_x, inc_grid(j), num2str(casos{i}(j)), ...
+             'FontSize', 14, 'Interpreter', 'latex')
+    end
+    
+    hold off
+    title(['Excentricidad ', num2str(e_values(i))], 'FontSize', 12, 'Interpreter', 'latex')
+    xlabel('Semieje mayor (km)', 'FontSize', 12, 'Interpreter', 'latex')
+    if i == 1
+        ylabel('Inclinaci\''on ($^\circ$)', 'FontSize', 12, 'Interpreter', 'latex')
+    end
+
+    xlim([min(a_km), max(a_km)])
+    ylim([min(inc_deg)-5, max(inc_deg)+5])
+    
+    set(gca,'XTick', a_km)
+    set(gca,'YTick', inc_deg)
+    
+    grid on
+    box off
+end
+
+set(gcf, 'WindowState', 'fullscreen');
+pause(1); 
+filenameSVG = 'casos_de_estudio';
+print(gcf, fullfile('figuras', filenameSVG), '-dsvg', '-vector')
+close(gcf);
 
 %% Generación de condiciones iniciales
 idx = 1;  % Contador global de combinaciones
@@ -66,10 +122,11 @@ dy0I = velECI(2, :); % Velocidad y inicial
 dz0I = velECI(3, :); % Velocidad z inicial
 
 %% Simulación parcial de trayectorias analíticas
-soluciones_J2              = cell(num_a, num_e, num_inc);
-soluciones_J2J3            = cell(num_a, num_e, num_inc);
-soluciones_kechichian_J2   = cell(num_a, num_e, num_inc);
-soluciones_kechichian_J2J3 = cell(num_a, num_e, num_inc);
+soluciones_J2            = cell(num_a, num_e, num_inc);
+soluciones_J3            = cell(num_a, num_e, num_inc);
+soluciones_J2J3          = cell(num_a, num_e, num_inc);
+soluciones_kechichian_J2 = cell(num_a, num_e, num_inc);
+soluciones_kechichian_J3 = cell(num_a, num_e, num_inc);
 
 for ia = 1:num_a
     a = a_values(ia);
@@ -91,11 +148,14 @@ for ia = 1:num_a
             [xJ2, yJ2, zJ2, xdotJ2, ydotJ2, zdotJ2] = computeGeneralSolution(...
                 J2, 0, R, a, e, INC, Omega, omega, theta_0, X0, n, current_t);
 
-            [xKJ2J3, yKJ2J3, zKJ2J3, xdotKJ2J3, ydotKJ2J3, zdotKJ2J3] = computeGeneralSolutionKechichian(...
-                J2, J3, R, a, e, INC, Omega, omega, theta_0, X0, n, current_t);
+            [xJ3, yJ3, zJ3, xdotJ3, ydotJ3, zdotJ3] = computeGeneralSolution(...
+                0, J3, R, a, e, INC, Omega, omega, theta_0, X0, n, current_t);
 
             [xKJ2, yKJ2, zKJ2, xdotKJ2, ydotKJ2, zdotKJ2] = computeGeneralSolutionKechichian(...
                 J2, 0, R, a, e, INC, Omega, omega, theta_0, X0, n, current_t);
+
+            [xKJ3, yKJ3, zKJ3, xdotKJ3, ydotKJ3, zdotKJ3] = computeGeneralSolutionKechichian(...
+                0, J3, R, a, e, INC, Omega, omega, theta_0, X0, n, current_t);
 
             % Almacenamiento de la solución analítica
             soluciones_J2J3{ia, ie, iinc} = struct(...
@@ -109,18 +169,24 @@ for ia = 1:num_a
                 'a', a, 'e', e, 'inc', INC, ...
                 'xJ', xJ2, 'yJ', yJ2, 'zJ', zJ2,...
                 'xdotJ', xdotJ2, 'ydotJ', ydotJ2, 'zdotJ', zdotJ2);
-            
-            soluciones_kechichian_J2J3{ia, ie, iinc} = struct(...
+
+            soluciones_J3{ia, ie, iinc} = struct(...
                 't', current_t, ...
                 'a', a, 'e', e, 'inc', INC, ...
-                'xJ', xKJ2J3, 'yJ', yKJ2J3, 'zJ', zKJ2J3,...
-                'xdotJ', xdotKJ2J3, 'ydotJ', ydotKJ2J3, 'zdotJ', zdotKJ2J3);
+                'xJ', xJ3, 'yJ', yJ3, 'zJ', zJ3,...
+                'xdotJ', xdotJ3, 'ydotJ', ydotJ3, 'zdotJ', zdotJ3);
 
             soluciones_kechichian_J2{ia, ie, iinc} = struct(...
                 't', current_t, ...
                 'a', a, 'e', e, 'inc', INC, ...
                 'xJ', xKJ2, 'yJ', yKJ2, 'zJ', zKJ2,...
                 'xdotJ', xdotKJ2, 'ydotJ', ydotKJ2, 'zdotJ', zdotKJ2);
+            
+            soluciones_kechichian_J3{ia, ie, iinc} = struct(...
+                't', current_t, ...
+                'a', a, 'e', e, 'inc', INC, ...
+                'xJ', xKJ3, 'yJ', yKJ3, 'zJ', zKJ3,...
+                'xdotJ', xdotKJ3, 'ydotJ', ydotKJ3, 'zdotJ', zdotKJ3);
         end
     end
 end
@@ -132,6 +198,7 @@ opts = odeset('RelTol', 1e-12, 'AbsTol', 1e-5); % Tolerancias numéricas
 % Inicialización de almacenamiento de soluciones numéricas
 dXdt_kepler      = cell(1, combinations); % Soluciones keplerianas
 dXdt_cowell_J2   = cell(1, combinations); % Soluciones con J2
+dXdt_cowell_J3   = cell(1, combinations); % Soluciones con J3
 dXdt_cowell_J2J3 = cell(1, combinations); % Soluciones con J2/J3
 dXdt_hodei       = cell(1, combinations); % Soluciones con variables polares-nodales
 
@@ -156,6 +223,9 @@ for ia = 1:num_a
             dXdt_cowell_J2{idx} = cowellZonals(...
                 X0I, current_t, mu, R, [J2; 0; 0; 0; 0], opts);
 
+            dXdt_cowell_J3{idx} = cowellZonals(...
+                X0I, current_t, mu, R, [0; J3; 0; 0; 0], opts);
+
             % Dinámica con variables polares-nodales
             dXdt_hodei{idx} = hodeiMotionCartesian(current_t, X0I, mu, R, 0, J2, opts);
             
@@ -174,11 +244,13 @@ for ia = 1:num_a
 
             % Extraer datos de las soluciones numéricas
             analytical_data_J2   = soluciones_J2{ia, ie, iinc};
+            analytical_data_J3   = soluciones_J3{ia, ie, iinc};
             analytical_data_J2J3 = soluciones_J2J3{ia, ie, iinc};
-            kechichian_data_J2   = soluciones_kechichian_J2J3{ia, ie, iinc};
-            kechichian_data_J2J3 = soluciones_kechichian_J2{ia, ie, iinc};
+            kechichian_data_J2   = soluciones_kechichian_J2{ia, ie, iinc};
+            kechichian_data_J3   = soluciones_kechichian_J3{ia, ie, iinc};
             kepler_data          = dXdt_kepler{idx};
             cowell_data_J2       = dXdt_cowell_J2{idx};
+            cowell_data_J3       = dXdt_cowell_J3{idx};
             cowell_data_J2J3     = dXdt_cowell_J2J3{idx};
             hodei_data           = dXdt_hodei{idx};
             
@@ -194,30 +266,42 @@ for ia = 1:num_a
                 'analytical_dx_J2', kepler_data(:, 4) + analytical_data_J2.xdotJ', ...
                 'analytical_dy_J2', kepler_data(:, 5) + analytical_data_J2.ydotJ', ...
                 'analytical_dz_J2', kepler_data(:, 6) + analytical_data_J2.zdotJ', ...
+                'analytical_x_J3',  kepler_data(:, 1) + analytical_data_J3.xJ', ...
+                'analytical_y_J3',  kepler_data(:, 2) + analytical_data_J3.yJ', ...
+                'analytical_z_J3',  kepler_data(:, 3) + analytical_data_J3.zJ', ...
+                'analytical_dx_J3', kepler_data(:, 4) + analytical_data_J3.xdotJ', ...
+                'analytical_dy_J3', kepler_data(:, 5) + analytical_data_J3.ydotJ', ...
+                'analytical_dz_J3', kepler_data(:, 6) + analytical_data_J3.zdotJ', ...
                 'analytical_x_J2J3',  kepler_data(:, 1) + analytical_data_J2J3.xJ', ...
                 'analytical_y_J2J3',  kepler_data(:, 2) + analytical_data_J2J3.yJ', ...
                 'analytical_z_J2J3',  kepler_data(:, 3) + analytical_data_J2J3.zJ', ...
                 'analytical_dx_J2J3', kepler_data(:, 4) + analytical_data_J2J3.xdotJ', ...
                 'analytical_dy_J2J3', kepler_data(:, 5) + analytical_data_J2J3.ydotJ', ...
                 'analytical_dz_J2J3', kepler_data(:, 6) + analytical_data_J2J3.zdotJ', ...
-                'kechichian_x_J2',  kepler_data(:, 1) + kechichian_data_J2.xJ', ...
-                'kechichian_y_J2',  kepler_data(:, 2) + kechichian_data_J2.yJ', ...
-                'kechichian_z_J2',  kepler_data(:, 3) + kechichian_data_J2.zJ', ...
-                'kechichian_dx_J2', kepler_data(:, 4) + kechichian_data_J2.xdotJ', ...
-                'kechichian_dy_J2', kepler_data(:, 5) + kechichian_data_J2.ydotJ', ...
-                'kechichian_dz_J2', kepler_data(:, 6) + kechichian_data_J2.zdotJ', ...
-                'kechichian_x_J2J3',  kepler_data(:, 1) + kechichian_data_J2J3.xJ', ...
-                'analytical_y_J2J3',  kepler_data(:, 2) + kechichian_data_J2J3.yJ', ...
-                'kechichian_z_J2J3',  kepler_data(:, 3) + kechichian_data_J2J3.zJ', ...
-                'kechichian_dx_J2J3', kepler_data(:, 4) + kechichian_data_J2J3.xdotJ', ...
-                'kechichian_dy_J2J3', kepler_data(:, 5) + kechichian_data_J2J3.ydotJ', ...
-                'kechichian_dz_J2J3', kepler_data(:, 6) + kechichian_data_J2J3.zdotJ', ...
+                'kechichian_x_J2',  kepler_data(:, 1) + kechichian_data_J2.xJ, ...
+                'kechichian_y_J2',  kepler_data(:, 2) + kechichian_data_J2.yJ, ...
+                'kechichian_z_J2',  kepler_data(:, 3) + kechichian_data_J2.zJ, ...
+                'kechichian_dx_J2', kepler_data(:, 4) + kechichian_data_J2.xdotJ, ...
+                'kechichian_dy_J2', kepler_data(:, 5) + kechichian_data_J2.ydotJ, ...
+                'kechichian_dz_J2', kepler_data(:, 6) + kechichian_data_J2.zdotJ, ...
+                'kechichian_x_J3',  kepler_data(:, 1) + kechichian_data_J3.xJ, ...
+                'kechichian_y_J3',  kepler_data(:, 2) + kechichian_data_J3.yJ, ...
+                'kechichian_z_J3',  kepler_data(:, 3) + kechichian_data_J3.zJ, ...
+                'kechichian_dx_J3', kepler_data(:, 4) + kechichian_data_J3.xdotJ, ...
+                'kechichian_dy_J3', kepler_data(:, 5) + kechichian_data_J3.ydotJ, ...
+                'kechichian_dz_J3', kepler_data(:, 6) + kechichian_data_J3.zdotJ, ...
                 'cowell_x_J2',  cowell_data_J2(:, 1), ...
                 'cowell_y_J2',  cowell_data_J2(:, 2), ...
                 'cowell_z_J2',  cowell_data_J2(:, 3), ...
                 'cowell_dx_J2', cowell_data_J2(:, 4), ...
                 'cowell_dy_J2', cowell_data_J2(:, 5), ...
-                'cowell_dz_J2', cowell_data_J2(:, 6),  ...
+                'cowell_dz_J2', cowell_data_J2(:, 6), ...
+                'cowell_x_J3',  cowell_data_J3(:, 1), ...
+                'cowell_y_J3',  cowell_data_J3(:, 2), ...
+                'cowell_z_J3',  cowell_data_J3(:, 3), ...
+                'cowell_dx_J3', cowell_data_J3(:, 4), ...
+                'cowell_dy_J3', cowell_data_J3(:, 5), ...
+                'cowell_dz_J3', cowell_data_J3(:, 6),  ...
                 'cowell_x_J2J3',  cowell_data_J2J3(:, 1), ...
                 'cowell_y_J2J3',  cowell_data_J2J3(:, 2), ...
                 'cowell_z_J2J3',  cowell_data_J2J3(:, 3), ...
@@ -242,70 +326,68 @@ for ia = 1:num_a
     for ie = 1:num_e
         for iinc = 1:num_inc
             datos = resultados{ia, ie, iinc};
+            N = length(datos.t);
             
-            % Conversión de cada punto temporal
-            for k = 1:length(datos.t)
-                % Solución analítica con J2
-                r_analytical_J2 = [datos.analytical_x_J2(k); datos.analytical_y_J2(k); datos.analytical_z_J2(k)];
-                v_analytical_J2 = [datos.analytical_dx_J2(k); datos.analytical_dy_J2(k); datos.analytical_dz_J2(k)];
-                [a_analytical_J2, e_analytical_J2, i_analytical_J2, ...
-                    Omega_analytical_J2, omega_analytical_J2, theta_analytical_J2] = ECI2OE(mu, r_analytical_J2, v_analytical_J2);
-                
-                resultados{ia, ie, iinc}.oe_analytical_J2.a(k)     = a_analytical_J2;
-                resultados{ia, ie, iinc}.oe_analytical_J2.e(k)     = e_analytical_J2;
-                resultados{ia, ie, iinc}.oe_analytical_J2.i(k)     = i_analytical_J2;
-                resultados{ia, ie, iinc}.oe_analytical_J2.Omega(k) = Omega_analytical_J2;
-                resultados{ia, ie, iinc}.oe_analytical_J2.omega(k) = omega_analytical_J2;
-                resultados{ia, ie, iinc}.oe_analytical_J2.theta(k) = theta_analytical_J2;
-
-                % Solución analítica con J2 y J3
-                r_analytical_J2J3 = [datos.analytical_x_J2J3(k); datos.analytical_y_J2J3(k); datos.analytical_z_J2J3(k)];
-                v_analytical_J2J3 = [datos.analytical_dx_J2J3(k); datos.analytical_dy_J2J3(k); datos.analytical_dz_J2J3(k)];
-                [a_analytical_J2J3, e_analytical_J2J3, i_analytical_J2J3, ...
-                    Omega_analytical_J2J3, omega_analytical_J2J3, theta_analytical_J2J3] = ECI2OE(mu, r_analytical_J2J3, v_analytical_J2J3);
-                
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.a(k)     = a_analytical_J2J3;
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.e(k)     = e_analytical_J2J3;
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.i(k)     = i_analytical_J2J3;
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.Omega(k) = Omega_analytical_J2J3;
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.omega(k) = omega_analytical_J2J3;
-                resultados{ia, ie, iinc}.oe_analytical_J2J3.theta(k) = theta_analytical_J2J3;
-
-                % Método de Cowell de J2
-                r_cowell_J2 = [datos.cowell_x_J2(k); datos.cowell_y_J2(k); datos.cowell_z_J2(k)];
-                v_cowell_J2 = [datos.cowell_dx_J2(k); datos.cowell_dy_J2(k); datos.cowell_dz_J2(k)];
-                [a_cowell_J2, e_cowell_J2, i_cowell_J2, ...
-                    Omega_cowell_J2, omega_cowell_J2, theta_cowell_J2] = ECI2OE(mu, r_cowell_J2, v_cowell_J2);
-                
-                resultados{ia, ie, iinc}.oe_cowell_J2.a(k)     = a_cowell_J2;
-                resultados{ia, ie, iinc}.oe_cowell_J2.e(k)     = e_cowell_J2;
-                resultados{ia, ie, iinc}.oe_cowell_J2.i(k)     = i_cowell_J2;
-                resultados{ia, ie, iinc}.oe_cowell_J2.Omega(k) = Omega_cowell_J2;
-                resultados{ia, ie, iinc}.oe_cowell_J2.omega(k) = omega_cowell_J2;
-                resultados{ia, ie, iinc}.oe_cowell_J2.theta(k) = theta_cowell_J2;
-
-                % Método de Cowell de J2 y J3
-                r_cowell_J2J3 = [datos.cowell_x_J2J3(k); datos.cowell_y_J2J3(k); datos.cowell_z_J2J3(k)];
-                v_cowell_J2J3 = [datos.cowell_dx_J2J3(k); datos.cowell_dy_J2J3(k); datos.cowell_dz_J2J3(k)];
-                [a_cowell_J2J3, e_cowell_J2J3, i_cowell_J2J3, ...
-                    Omega_cowell_J2J3, omega_cowell_J2J3, theta_cowell_J2J3] = ECI2OE(mu, r_cowell_J2J3, v_cowell_J2J3);
-                
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.a(k)     = a_cowell_J2J3;
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.e(k)     = e_cowell_J2J3;
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.i(k)     = i_cowell_J2J3;
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.Omega(k) = Omega_cowell_J2J3;
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.omega(k) = omega_cowell_J2J3;
-                resultados{ia, ie, iinc}.oe_cowell_J2J3.theta(k) = theta_cowell_J2J3;
-            end
+            % Preparar matrices de posición y velocidad (Nx3)
+            % Método analítico J2
+            r_analytical_J2 = [datos.analytical_x_J2, datos.analytical_y_J2, datos.analytical_z_J2];
+            v_analytical_J2 = [datos.analytical_dx_J2, datos.analytical_dy_J2, datos.analytical_dz_J2];
+            
+            % Método analítico J2+J3
+            r_analytical_J2J3 = [datos.analytical_x_J2J3, datos.analytical_y_J2J3, datos.analytical_z_J2J3];
+            v_analytical_J2J3 = [datos.analytical_dx_J2J3, datos.analytical_dy_J2J3, datos.analytical_dz_J2J3];
+            
+            % Cowell J2
+            r_cowell_J2 = [datos.cowell_x_J2, datos.cowell_y_J2, datos.cowell_z_J2];
+            v_cowell_J2 = [datos.cowell_dx_J2, datos.cowell_dy_J2, datos.cowell_dz_J2];
+            
+            % Cowell J2+J3
+            r_cowell_J2J3 = [datos.cowell_x_J2J3, datos.cowell_y_J2J3, datos.cowell_z_J2J3];
+            v_cowell_J2J3 = [datos.cowell_dx_J2J3, datos.cowell_dy_J2J3, datos.cowell_dz_J2J3];
+            
+            % Calcular elementos orbitales (llamada vectorizada)
+            [a_analytical_J2, e_analytical_J2, i_analytical_J2, ...
+                RAAN_analytical_J2, omega_analytical_J2, theta_analytical_J2, ...
+                AOLon_analytical_J2, AOLat_analytical_J2] = ECI2OE(mu, r_analytical_J2, v_analytical_J2);
+            [a_analytical_J2J3, e_analytical_J2J3, i_analytical_J2J3, ...
+                RAAN_analytical_J2J3, omega_analytical_J2J3, theta_analytical_J2J3, ...
+                AOLon_analytical_J2J3, AOLat_analytical_J2J3] = ECI2OE(mu, r_analytical_J2J3, v_analytical_J2J3);
+            [a_cowell_J2, e_cowell_J2, i_cowell_J2, ...
+                RAAN_cowell_J2, omega_cowell_J2, theta_cowell_J2, ...
+                AOLon_cowell_J2, AOLat_cowell_J2] = ECI2OE(mu, r_cowell_J2, v_cowell_J2);
+            [a_cowell_J2J3, e_cowell_J2J3, i_cowell_J2J3, ...
+                RAAN_cowell_J2J3, omega_cowell_J2J3, theta_cowell_J2J3, ...
+                AOLon_cowell_J2J3, AOLat_cowell_J2J3] = ECI2OE(mu, r_cowell_J2J3, v_cowell_J2J3);
+            
+            % Almacenar resultados (estructura vectorizada)
+            % Analítico J2
+            resultados{ia, ie, iinc}.oe_analytical_J2 = struct(...
+                'a', a_analytical_J2, 'e', e_analytical_J2, 'i', i_analytical_J2, ...
+                'Omega', RAAN_analytical_J2, 'omega', omega_analytical_J2, 'theta', theta_analytical_J2, ...
+                'AOLon', AOLon_analytical_J2, 'AOLat', AOLat_analytical_J2);
+            
+            % Analítico J2+J3
+            resultados{ia, ie, iinc}.oe_analytical_J2J3 = struct(...
+                'a', a_analytical_J2J3, 'e', e_analytical_J2J3, 'i', i_analytical_J2J3, ...
+                'Omega', RAAN_analytical_J2J3, 'omega', omega_analytical_J2J3, 'theta', theta_analytical_J2J3, ...
+                'AOLon', AOLon_analytical_J2J3, 'AOLat', AOLat_analytical_J2J3);
+            
+            % Cowell J2
+            resultados{ia, ie, iinc}.oe_cowell_J2 = struct(...
+                'a', a_cowell_J2, 'e', e_cowell_J2, 'i', i_cowell_J2, ...
+                'Omega', RAAN_cowell_J2, 'omega', omega_cowell_J2, 'theta', theta_cowell_J2, ...
+                'AOLon', AOLon_cowell_J2, 'AOLat', AOLat_cowell_J2);
+            
+            % Cowell J2+J3
+            resultados{ia, ie, iinc}.oe_cowell_J2J3 = struct(...
+                'a', a_cowell_J2J3, 'e', e_cowell_J2J3, 'i', i_cowell_J2J3, ...
+                'Omega', RAAN_cowell_J2J3, 'omega', omega_cowell_J2J3, 'theta', theta_cowell_J2J3, ...
+                'AOLon', AOLon_cowell_J2J3, 'AOLat', AOLat_cowell_J2J3);
         end
     end
 end
 
 %% Generación de gráficos individuales
-if ~exist('figuras', 'dir')
-    mkdir('figuras'); 
-end
-
 set(0, 'DefaultFigureVisible', 'off');
 
 plasma = [0.20 0.02 0.40;
@@ -318,9 +400,9 @@ componentes = {
     'x'   '$x(t)$'        'km'
     'y'   '$y(t)$'        'km' 
     'z'   '$z(t)$'        'km'
-    'dx'  '$\dot{x}(t)$'  'm/s'
-    'dy'  '$\dot{y}(t)$'  'm/s'
-    'dz'  '$\dot{z}(t)$'  'm/s'
+    'dx'  '$\dot{x}(t)$'  'km/s'
+    'dy'  '$\dot{y}(t)$'  'km/s'
+    'dz'  '$\dot{z}(t)$'  'km/s'
 };
 
 if ~exist('figuras/eciJ2J3vsJ2J3', 'dir')
@@ -336,11 +418,7 @@ for ia = 1:num_a
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
                 error_comp = datos.(['cowell_' var '_J2J3']) - datos.(['analytical_' var '_J2J3']);
-                if k < 4
-                    plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                else
-                    plot(datos.t, error_comp, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                end
+                plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
                 leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
 
@@ -362,10 +440,10 @@ for ia = 1:num_a
             box off;
 
             % Guardar figura
-            filenamePNG = sprintf('%s_a%s_e%s.png', var, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2J3vsJ2J3.png', var, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/eciJ2J3vsJ2J3', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/eciJ2J3vsJ2J3', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2J3vsJ2J3.svg', var, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/eciJ2J3vsJ2J3', filenameSVG), 'svg');
             close(gcf);
         end
     end
@@ -384,11 +462,7 @@ for ia = 1:num_a
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
                 error_comp = datos.(['cowell_' var '_J2J3']) - datos.(['analytical_' var '_J2']);
-                if k < 4
-                    plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                else
-                    plot(datos.t, error_comp, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                end
+                plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
                 leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
 
@@ -401,7 +475,7 @@ for ia = 1:num_a
             % Título y etiquetas
             subtitulo = sprintf('$a$ = %.0f km, $e$ = %.3f, $J_3 \\neq 0$', datos.a/1e3, datos.e);
             subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
-            title(['Error de ' componentes{k,2}  'del modelo truncado'], 'Interpreter', 'latex');
+            title(['Error de ' componentes{k,2} ' del modelo truncado'], 'Interpreter', 'latex');
             xlabel('$t$ (s)', 'Interpreter', 'latex');
             ylabel(['Error de ' componentes{k,2} ' (' componentes{k,3} ')'], 'Interpreter', 'latex');
             legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
@@ -410,10 +484,10 @@ for ia = 1:num_a
             box off;
 
             % Guardar figura
-            filenamePNG = sprintf('%s_a%s_e%s.png', var, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2vsJ2J3.png', var, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/eciJ2vsJ2J3', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/eciJ2vsJ2J3', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2vsJ2J3.svg', var, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/eciJ2vsJ2J3', filenameSVG), 'svg');
             close(gcf);
         end
     end
@@ -432,11 +506,7 @@ for ia = 1:num_a
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
                 error_comp = datos.(['cowell_' var '_J2']) - datos.(['analytical_' var '_J2']);
-                if k < 4
-                    plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                else
-                    plot(datos.t, error_comp, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                end
+                plot(datos.t, error_comp / 1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
                 leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
 
@@ -449,7 +519,7 @@ for ia = 1:num_a
             % Título y etiquetas
             subtitulo = sprintf('$a$ = %.0f km, $e$ = %.3f, $J_3 = 0$', datos.a/1e3, datos.e);
             subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
-            title(['Error de ' componentes{k,2}], 'Interpreter', 'latex');
+            title(['Error de ' componentes{k,2} ' del modelo simplificado'], 'Interpreter', 'latex');
             xlabel('$t$ (s)', 'Interpreter', 'latex');
             ylabel(['Error de ' componentes{k,2} ' (' componentes{k,3} ')'], 'Interpreter', 'latex');
             legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
@@ -458,24 +528,34 @@ for ia = 1:num_a
             box off;
 
             % Guardar figura
-            filenamePNG = sprintf('%s_a%s_e%s.png', var, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2vsJ2.png', var, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/eciJ2vsJ2', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/eciJ2vsJ2', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2vsJ2.svg', var, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/eciJ2vsJ2', filenameSVG), 'svg');
             close(gcf);
         end
     end
 end
 
-%% Gráficos de diferencia en elementos orbitales
+%% Gráficos de diferencia en elementos orbitales (MODIFICAR ESTA PARTE PARA RAAN, AOP Y TA)
+
+set(0, 'DefaultFigureVisible', 'off');
+
+plasma = [0.20 0.02 0.40;
+          0.32 0.02 0.60;
+          0.56 0.07 0.65;
+          0.82 0.29 0.48;
+          0.95 0.52 0.27];
 
 elementos_orbitales = {
-    'a'      '$a(t)$'       'km'
-    'e'      '$e(t)$'       '-'
-    'i'      '$i(t)$'       '$^\circ$' 
-    'Omega'  '$\Omega(t)$'  '$^\circ$'
-    'omega'  '$\omega(t)$'  '$^\circ$'
-    'theta'  '$\theta(t)$'  '$^\circ$'
+    'a'      '$a(t)$'       'km'        'SMA'
+    'e'      '$e(t)$'       '-'         'ECC'
+    'i'      '$i(t)$'       '$^\circ$'  'INC'
+    'omega'  '$\Omega(t)$'  '$^\circ$'  'RAAN'
+    'omega'  '$\omega(t)$'  '$^\circ$'  'AOP'
+    'theta'  '$\theta(t)$'  '$^\circ$'  'TA' 
+    'AOLon'  '$\varpi(t)$'  '$^\circ$'  'AOLon'
+    'AOLat'  '$u(t)$'       '$^\circ$'  'AOLat' 
 };
 
 if ~exist('figuras/oeJ2J3vsJ2J3', 'dir')
@@ -486,20 +566,21 @@ for ia = 1:num_a
     for ie = 1:num_e
         for k = 1:size(elementos_orbitales, 1)
             elem = elementos_orbitales{k, 1};
+            elem_name = elementos_orbitales{k, 4};
             leyendas = cell(1, num_inc);
             figure; hold on;
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
-                diff_data = datos.oe_analytical_J2J3.(elem) - datos.oe_cowell_J2J3.(elem);
-                
-                % Escalar según necesidad
-                if strcmp(elem, 'a')
-                    plot_data = diff_data / 1e3;
+                if strcmp(elem, 'Omega') || strcmp(elem, 'omega') || strcmp(elem, 'theta') || strcmp(elem, 'AOLon') || strcmp(elem, 'AOLat')
+                    diff_data = wrapTo2Pi(datos.oe_analytical_J2J3.(elem)) - wrapTo2Pi(datos.oe_cowell_J2J3.(elem));
+                    diff_data = wrapTo360(rad2deg(diff_data));
+                elseif strcmp(elem, 'a')
+                    diff_data = (datos.oe_analytical_J2J3.(elem) - datos.oe_cowell_J2J3.(elem) ) / 1e3;
                 else
-                    plot_data = diff_data;
+                    diff_data = datos.oe_analytical_J2J3.(elem) - datos.oe_cowell_J2J3.(elem);
                 end
                 
-                plot(datos.t, plot_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+                plot(datos.t, diff_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
                 leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
             hold off;
@@ -522,10 +603,10 @@ for ia = 1:num_a
             box off;
             
             % Guardar figura en directorio 'oe'
-            filenamePNG = sprintf('%s_a%s_e%s.png', elem, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2J3vsJ2J3.png', elem_name, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/oeJ2J3vsJ2J3', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/oeJ2J3vsJ2J3', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2J3vsJ2J3.svg', elem_name, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/oeJ2J3vsJ2J3', filenameSVG), 'svg');
             close(gcf);
         end
     end
@@ -539,21 +620,22 @@ for ia = 1:num_a
     for ie = 1:num_e
         for k = 1:size(elementos_orbitales, 1)
             elem = elementos_orbitales{k, 1};
+            elem_name = elementos_orbitales{k, 4};
             leyendas = cell(1, num_inc);
             figure; hold on;
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
-                diff_data = datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2J3.(elem);
-                
-                % Escalar según necesidad
-                if strcmp(elem, 'a')
-                    plot_data = diff_data / 1e3;  % Convertir m → km
+                if strcmp(elem, 'Omega') || strcmp(elem, 'omega') || strcmp(elem, 'theta') || strcmp(elem, 'AOLon') || strcmp(elem, 'AOLat')
+                    diff_data = wrapTo2Pi(datos.oe_analytical_J2.(elem)) - wrapTo2Pi(datos.oe_cowell_J2J3.(elem));
+                    diff_data = wrapTo360(rad2deg(diff_data));
+                elseif strcmp(elem, 'a')
+                    diff_data = (datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2J3.(elem) ) / 1e3;
                 else
-                    plot_data = diff_data;
+                    diff_data = datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2J3.(elem);
                 end
                 
-                plot(datos.t, plot_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
-                leyendas{iinc} = sprintf('i = %.2f$^\\circ$', rad2deg(datos.inc));
+                plot(datos.t, diff_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+                leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
             hold off;
             
@@ -566,7 +648,7 @@ for ia = 1:num_a
             % Configuración del gráfico
             subtitulo = sprintf('$a$ = %.0f km, $e$ = %.3f, $J_3 \\neq 0$', datos.a/1e3, datos.e);
             subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
-            title(['Error de ' elementos_orbitales{k,2} 'del modelo truncado'], 'Interpreter', 'latex');
+            title(['Error de ' elementos_orbitales{k,2} ' del modelo truncado'], 'Interpreter', 'latex');
             xlabel('$t$ (s)', 'Interpreter', 'latex');
             ylabel(['Error de ' elementos_orbitales{k,2} ' (' elementos_orbitales{k,3} ')'], 'Interpreter', 'latex');
             legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
@@ -575,10 +657,10 @@ for ia = 1:num_a
             box off;
             
             % Guardar figura en directorio 'oe'
-            filenamePNG = sprintf('%s_a%s_e%s.png', elem, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2vsJ2J3.png', elem_name, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/oeJ2vsJ2J3', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/oeJ2vsJ2J3', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2vsJ2J3.svg', elem_name, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/oeJ2vsJ2J3', filenameSVG), 'svg');
             close(gcf);
         end
     end
@@ -592,20 +674,21 @@ for ia = 1:num_a
     for ie = 1:num_e
         for k = 1:size(elementos_orbitales, 1)
             elem = elementos_orbitales{k, 1};
+            elem_name = elementos_orbitales{k, 4};
             leyendas = cell(1, num_inc);
             figure; hold on;
             for iinc = 1:num_inc
                 datos = resultados{ia, ie, iinc};
-                diff_data = datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2.(elem);
-                
-                % Escalar según necesidad
-                if strcmp(elem, 'a')
-                    plot_data = diff_data / 1e3;  % Convertir m → km
+                if strcmp(elem, 'Omega') || strcmp(elem, 'omega') || strcmp(elem, 'theta') || strcmp(elem, 'AOLon') || strcmp(elem, 'AOLat')
+                    diff_data = wrapTo2Pi(datos.oe_analytical_J2.(elem)) - wrapTo2Pi(datos.oe_cowell_J2.(elem));
+                    diff_data = wrapTo360(rad2deg(diff_data));
+                elseif strcmp(elem, 'a')
+                    diff_data = (datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2.(elem) ) / 1e3;
                 else
-                    plot_data = diff_data;
+                    diff_data = datos.oe_analytical_J2.(elem) - datos.oe_cowell_J2.(elem);
                 end
                 
-                plot(datos.t, plot_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+                plot(datos.t, diff_data, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
                 leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
             end
             hold off;
@@ -628,10 +711,10 @@ for ia = 1:num_a
             box off;
             
             % Guardar figura en directorio 'oe'
-            filenamePNG = sprintf('%s_a%s_e%s.png', elem, a_clean, e_clean);
+            filenamePNG = sprintf('%s_a%s_e%s_J2vsJ2.png', elem_name, a_clean, e_clean);
             saveas(gcf, fullfile('figuras/oeJ2vsJ2', filenamePNG));
-            % filenameSVG = sprintf('%s_a%s_e%s.svg', var, a_clean, e_clean);
-            % saveas(gcf, fullfile('figuras/oeJ2vsJ2', filenameSVG), 'svg');
+            filenameSVG = sprintf('%s_a%s_e%s_J2vsJ2.svg', elem_name, a_clean, e_clean);
+            saveas(gcf, fullfile('figuras/oeJ2vsJ2', filenameSVG), 'svg');
             close(gcf);
         end
     end
@@ -676,10 +759,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('r_a%s_e%s.png', a_clean, e_clean);
+        filenamePNG = sprintf('r_a%s_e%s_J2J3vsJ2J3.png', a_clean, e_clean);
         saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenamePNG));
-        % filenameSVG = sprintf('r_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_e%s_J2J3vsJ2J3.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenameSVG), 'svg');
         close(gcf);
 
         % Error de velocidad
@@ -691,7 +774,7 @@ for ia = 1:num_a
             analytical_v = [datos.analytical_dx_J2J3, datos.analytical_dy_J2J3, datos.analytical_dz_J2J3];
             error_vel    = vecnorm(cowell_v - analytical_v, 2, 2);
 
-            plot(datos.t, error_vel, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+            plot(datos.t, error_vel/1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
             leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
         end
         hold off;
@@ -701,7 +784,7 @@ for ia = 1:num_a
         subtitle(subtititulo, 'Interpreter', 'latex', 'FontSize', 10);
         title('Error de $||v(t)||$', 'Interpreter', 'latex');
         xlabel('$t$ (s)', 'Interpreter', 'latex');
-        ylabel('Error de $||v(t)||$ (m/s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
         legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
         xlim([min(datos.t), max(datos.t)]);
         grid on; 
@@ -712,10 +795,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('v_a%s_e%s.png', a_clean, e_clean);
+        filenamePNG = sprintf('v_a%s_e%s_J2J3vsJ2J3.png', a_clean, e_clean);
         saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenamePNG));
-        % filenameSVG = sprintf('v_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenameSVG), 'svg');
+        filenameSVG = sprintf('v_a%s_e%s_J2J3vsJ2J3.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenameSVG), 'svg');
         close(gcf);
     end
 end
@@ -758,10 +841,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('r_a%s_e%s.png', a_clean, e_clean);
+        filenamePNG = sprintf('r_a%s_e%s_J2vsJ2J3.png', a_clean, e_clean);
         saveas(gcf, fullfile('figuras/modulosJ2vsJ2J3', filenamePNG));
-        % filenameSVG = sprintf('r_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2vsJ2J3', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_e%s_J2vsJ2J3.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2vsJ2J3', filenameSVG), 'svg');
         close(gcf);
 
         % Error de velocidad
@@ -773,7 +856,7 @@ for ia = 1:num_a
             analytical_v = [datos.analytical_dx_J2, datos.analytical_dy_J2, datos.analytical_dz_J2];
             error_vel    = vecnorm(cowell_v - analytical_v, 2, 2);
 
-            plot(datos.t, error_vel, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+            plot(datos.t, error_vel/1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
             leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
         end
         hold off;
@@ -783,7 +866,7 @@ for ia = 1:num_a
         subtitle(subtititulo, 'Interpreter', 'latex', 'FontSize', 10);
         title('Error de $||v(t)||$ del modelo truncado', 'Interpreter', 'latex');
         xlabel('$t$ (s)', 'Interpreter', 'latex');
-        ylabel('Error de $||v(t)||$ (m/s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
         legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
         xlim([min(datos.t), max(datos.t)]);
         grid on; 
@@ -794,10 +877,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('v_a%s_e%s.png', a_clean, e_clean);
-        saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenamePNG));
-        % filenameSVG = sprintf('v_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2J3vsJ2J3', filenameSVG), 'svg');
+        filenamePNG = sprintf('v_a%s_e%s_J2vsJ2J3.png', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2vsJ2J3', filenamePNG));
+        filenameSVG = sprintf('v_a%s_e%s_J2vsJ2J3.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2vsJ2J3', filenameSVG), 'svg');
         close(gcf);
     end
 end
@@ -827,7 +910,7 @@ for ia = 1:num_a
         % Título y etiquetas
         subtititulo = sprintf('$a$ = %.0f km, $e$ = %.3f, $J_3 = 0$', datos.a/1e3, datos.e);
         subtitle(subtititulo, 'Interpreter', 'latex', 'FontSize', 10);
-        title('Error de $||r(t)||$', 'Interpreter', 'latex');
+        title('Error de $||r(t)||$ del modelo simplificado', 'Interpreter', 'latex');
         xlabel('$t$ (s)', 'Interpreter', 'latex');
         ylabel('Error de $||r(t)||$ (km)', 'Interpreter', 'latex');
         legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
@@ -840,10 +923,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('r_a%s_e%s.png', a_clean, e_clean);
+        filenamePNG = sprintf('r_a%s_e%s_J2vsJ2.png', a_clean, e_clean);
         saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenamePNG));
-        % filenameSVG = sprintf('r_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_e%s_J2vsJ2.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenameSVG), 'svg');
         close(gcf);
 
         % Error de velocidad
@@ -855,7 +938,7 @@ for ia = 1:num_a
             analytical_v = [datos.analytical_dx_J2, datos.analytical_dy_J2, datos.analytical_dz_J2];
             error_vel    = vecnorm(cowell_v - analytical_v, 2, 2);
 
-            plot(datos.t, error_vel, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
+            plot(datos.t, error_vel/1e3, 'Color', plasma(iinc, :), 'LineWidth', 1.5);
             leyendas{iinc} = sprintf('$i$ = %.2f$^\\circ$', rad2deg(datos.inc));
         end
         hold off;
@@ -863,9 +946,9 @@ for ia = 1:num_a
         % Título y etiquetas
         subtititulo = sprintf('$a$ = %.0f km, $e$ = %.3f, $J_3 = 0$', datos.a/1e3, datos.e);
         subtitle(subtititulo, 'Interpreter', 'latex', 'FontSize', 10);
-        title('Error de $||v(t)||$ del modelo truncado', 'Interpreter', 'latex');
+        title('Error de $||v(t)||$ del modelo simplificado', 'Interpreter', 'latex');
         xlabel('$t$ (s)', 'Interpreter', 'latex');
-        ylabel('Error de $||v(t)||$ (m/s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
         legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
         xlim([min(datos.t), max(datos.t)]);
         grid on; 
@@ -876,10 +959,10 @@ for ia = 1:num_a
         e_str = sprintf('%.3f', datos.e);
         e_parts = strsplit(e_str, '.');
         e_clean = e_parts{2};
-        filenamePNG = sprintf('v_a%s_e%s.png', a_clean, e_clean);
+        filenamePNG = sprintf('v_a%s_e%s_J2vsJ2.png', a_clean, e_clean);
         saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenamePNG));
-        % filenameSVG = sprintf('v_a%s_e%s.svg', a_clean, e_clean);
-        % saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenameSVG), 'svg');
+        filenameSVG = sprintf('v_a%s_e%s_J2vsJ2.svg', a_clean, e_clean);
+        saveas(gcf, fullfile('figuras/modulosJ2vsJ2', filenameSVG), 'svg');
         close(gcf);
     end
 end
@@ -896,14 +979,11 @@ plasma_complement = [
     0.05 0.48 0.73
 ];
 
-
 % Obtener paleta de colores
 color_analytical_min = plasma(2, :);
 color_comparison_min = plasma_complement(2, :);
 color_analytical_max = plasma(3, :);
 color_comparison_max = plasma_complement(3, :);
-
-
 
 if ~exist('figuras/kechichianJ2vsJ2', 'dir')
     mkdir('figuras', 'kechichianJ2vsJ2');
@@ -921,9 +1001,16 @@ for ia = 1:num_a
         cowell_r_min     = [    datos_min.cowell_x_J2,     datos_min.cowell_y_J2,     datos_min.cowell_z_J2];
         analytical_r_min = [datos_min.analytical_x_J2, datos_min.analytical_y_J2, datos_min.analytical_z_J2];
         kechichian_r_min = [datos_min.kechichian_x_J2, datos_min.kechichian_y_J2, datos_min.kechichian_z_J2];
+
+        cowell_v_min     = [    datos_min.cowell_dx_J2,     datos_min.cowell_dy_J2,     datos_min.cowell_dz_J2];
+        analytical_v_min = [datos_min.analytical_dx_J2, datos_min.analytical_dy_J2, datos_min.analytical_dz_J2];
+        kechichian_v_min = [datos_min.kechichian_dx_J2, datos_min.kechichian_dy_J2, datos_min.kechichian_dz_J2];
         
-        error_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
-        error_kechichian_min = vecnorm(cowell_r_min - kechichian_r_min, 2, 2);
+        error_r_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
+        error_r_kechichian_min = vecnorm(cowell_r_min - kechichian_r_min, 2, 2);
+
+        error_v_analytical_min = vecnorm(cowell_v_min - analytical_v_min, 2, 2);
+        error_v_kechichian_min = vecnorm(cowell_v_min - kechichian_v_min, 2, 2);
         
         % Último valor de excentricidad (máximo)
         ie_max = num_e;
@@ -932,20 +1019,17 @@ for ia = 1:num_a
         % Cálculo de errores para excentricidad máxima
         cowell_r_max     = [    datos_max.cowell_x_J2,     datos_max.cowell_y_J2,    datos_max.cowell_z_J2];
         analytical_r_max = [datos_max.analytical_x_J2, datos_max.analytical_y_J2, datos_max.analytical_z_J2];
-        kechichian_r_max = [datos_max.kechichian_x_J2, datos_max.kechichian_y_J2, kechichian_z_J2.hodei_z];
+        kechichian_r_max = [datos_max.kechichian_x_J2, datos_max.kechichian_y_J2, datos_max.kechichian_z_J2];
+
+        cowell_v_max     = [    datos_max.cowell_dx_J2,     datos_max.cowell_dy_J2,    datos_max.cowell_dz_J2];
+        analytical_v_max = [datos_max.analytical_dx_J2, datos_max.analytical_dy_J2, datos_max.analytical_dz_J2];
+        kechichian_v_max = [datos_max.kechichian_dx_J2, datos_max.kechichian_dy_J2, datos_max.kechichian_dz_J2];
         
-        error_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
-        error_kechichian_max = vecnorm(cowell_r_max - kechichian_r_max, 2, 2);
-        
-        % Graficar (líneas discontinuas para primera excentricidad)
-        plot(datos_min.t, error_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
-        plot(datos_min.t, error_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
-        
-        % Graficar (líneas continuas para última excentricidad)
-        plot(datos_max.t, error_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
-        plot(datos_max.t, error_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
-        
-        hold off;
+        error_r_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
+        error_r_kechichian_max = vecnorm(cowell_r_max - kechichian_r_max, 2, 2);
+
+        error_v_analytical_max = vecnorm(cowell_v_max - analytical_v_max, 2, 2);
+        error_v_kechichian_max = vecnorm(cowell_v_max - kechichian_v_max, 2, 2);
         
         % Configurar leyenda
         leyendas = {
@@ -954,6 +1038,16 @@ for ia = 1:num_a
             sprintf(    'Benito ($e$ = %.3f)', datos_max.e)
             sprintf('Kechichian ($e$ = %.3f)', datos_max.e)
         };
+
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_r_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_r_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_r_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_r_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
         
         % Configuración del gráfico
         subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_3 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
@@ -970,16 +1064,49 @@ for ia = 1:num_a
         a_clean = sprintf('%.0f', datos_min.a/1e3);
         inc_deg = rad2deg(datos_min.inc);
         inc_clean = sprintf('%.0f', inc_deg);
-        filenamePNG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
+        filenamePNG = sprintf('r_a%s_i%s_kechichianJ2vsJ2.png', a_clean, inc_clean);
         saveas(gcf, fullfile('figuras/kechichianJ2vsJ2', filenamePNG));        
-        % filenameSVG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
-        % saveas(gcf, fullfile('figuras/kechichianJ2vsJ2', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_i%s_kechichianJ2vsJ2.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ2vsJ2', filenameSVG), 'svg');
+        close(gcf);
+
+
+        figure; hold on;
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_v_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_v_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_v_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_v_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
+        
+        % Configuración del gráfico
+        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_3 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
+        subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
+        title('Error de $||v(t)||$', 'Interpreter', 'latex');
+        xlabel('$t$ (s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
+        legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
+        xlim([min(datos_min.t), max(datos_min.t)]);
+        grid on; 
+        box off;
+        
+        % Guardar figura
+        a_clean = sprintf('%.0f', datos_min.a/1e3);
+        inc_deg = rad2deg(datos_min.inc);
+        inc_clean = sprintf('%.0f', inc_deg);
+        filenamePNG = sprintf('v_a%s_i%s_kechichianJ2vsJ2.png', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ2vsJ2', filenamePNG));        
+        filenameSVG = sprintf('v_a%s_i%s_kechichianJ2vsJ2.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ2vsJ2', filenameSVG), 'svg');
         close(gcf);
     end
 end
 
-if ~exist('figuras/kechichianJ2J3vsJ2J3', 'dir')
-    mkdir('figuras', 'kechichianJ2J3vsJ2J3');
+if ~exist('figuras/kechichianJ3vsJ3', 'dir')
+    mkdir('figuras', 'kechichianJ3vsJ3');
 end
 
 for ia = 1:num_a
@@ -991,34 +1118,38 @@ for ia = 1:num_a
         datos_min = resultados{ia, ie_min, iinc};
         
         % Cálculo de errores para excentricidad mínima
-        cowell_r_min     = [    datos_min.cowell_x_J2J3,     datos_min.cowell_y_J2J3,     datos_min.cowell_z_J2J3];
-        analytical_r_min = [datos_min.analytical_x_J2J3, datos_min.analytical_y_J2J3, datos_min.analytical_z_J2J3];
-        kechichian_r_min = [datos_min.kechichian_x_J2J3, datos_min.kechichian_y_J2J3, datos_min.kechichian_z_J2J3];
+        cowell_r_min     = [    datos_min.cowell_x_J3,     datos_min.cowell_y_J3,     datos_min.cowell_z_J3];
+        analytical_r_min = [datos_min.analytical_x_J3, datos_min.analytical_y_J3, datos_min.analytical_z_J3];
+        kechichian_r_min = [datos_min.kechichian_x_J3, datos_min.kechichian_y_J3, datos_min.kechichian_z_J3];
+
+        cowell_v_min     = [    datos_min.cowell_dx_J3,     datos_min.cowell_dy_J3,     datos_min.cowell_dz_J3];
+        analytical_v_min = [datos_min.analytical_dx_J3, datos_min.analytical_dy_J3, datos_min.analytical_dz_J3];
+        kechichian_v_min = [datos_min.kechichian_dx_J3, datos_min.kechichian_dy_J3, datos_min.kechichian_dz_J3];
         
-        error_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
-        error_kechichian_min = vecnorm(cowell_r_min - kechichian_r_min, 2, 2);
+        error_r_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
+        error_r_kechichian_min = vecnorm(cowell_r_min - kechichian_r_min, 2, 2);
+
+        error_v_analytical_min = vecnorm(cowell_v_min - analytical_v_min, 2, 2);
+        error_v_kechichian_min = vecnorm(cowell_v_min - kechichian_v_min, 2, 2);
         
         % Último valor de excentricidad (máximo)
         ie_max = num_e;
         datos_max = resultados{ia, ie_max, iinc};
         
         % Cálculo de errores para excentricidad máxima
-        cowell_r_max     = [    datos_max.cowell_x_J2J3,     datos_max.cowell_y_J2J3,     datos_max.cowell_z_J2J3];
-        analytical_r_max = [datos_max.analytical_x_J2J3, datos_max.analytical_y_J2J3, datos_max.analytical_z_J2J3];
-        kechichian_r_max = [datos_max.kechichian_x_J2J3, datos_max.kechichian_y_J2J3, datos_max.kechichian_z_J2J3];
+        cowell_r_max     = [    datos_max.cowell_x_J3,     datos_max.cowell_y_J3,     datos_max.cowell_z_J3];
+        analytical_r_max = [datos_max.analytical_x_J3, datos_max.analytical_y_J3, datos_max.analytical_z_J3];
+        kechichian_r_max = [datos_max.kechichian_x_J3, datos_max.kechichian_y_J3, datos_max.kechichian_z_J3];
+
+        cowell_v_max     = [    datos_max.cowell_dx_J3,     datos_max.cowell_dy_J3,     datos_max.cowell_dz_J3];
+        analytical_v_max = [datos_max.analytical_dx_J3, datos_max.analytical_dy_J3, datos_max.analytical_dz_J3];
+        kechichian_v_max = [datos_max.kechichian_dx_J3, datos_max.kechichian_dy_J3, datos_max.kechichian_dz_J3];
         
-        error_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
-        error_kechichian_max = vecnorm(cowell_r_max - kechichian_r_max, 2, 2);
-        
-        % Graficar (líneas discontinuas para primera excentricidad)
-        plot(datos_min.t, error_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
-        plot(datos_min.t, error_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
-        
-        % Graficar (líneas continuas para última excentricidad)
-        plot(datos_max.t, error_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
-        plot(datos_max.t, error_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
-        
-        hold off;
+        error_r_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
+        error_r_kechichian_max = vecnorm(cowell_r_max - kechichian_r_max, 2, 2);
+
+        error_v_analytical_max = vecnorm(cowell_v_max - analytical_v_max, 2, 2);
+        error_v_kechichian_max = vecnorm(cowell_v_max - kechichian_v_max, 2, 2);
         
         % Configurar leyenda
         leyendas = {
@@ -1027,9 +1158,19 @@ for ia = 1:num_a
             sprintf(    'Benito ($e$ = %.3f)', datos_max.e)
             sprintf('Kechichian ($e$ = %.3f)', datos_max.e)
         };
+
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_r_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_r_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_r_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_r_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
         
         % Configuración del gráfico
-        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_3 \\neq 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
+        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_2 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
         subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
         title('Error de $||r(t)||$', 'Interpreter', 'latex');
         xlabel('$t$ (s)', 'Interpreter', 'latex');
@@ -1043,10 +1184,43 @@ for ia = 1:num_a
         a_clean = sprintf('%.0f', datos_min.a/1e3);
         inc_deg = rad2deg(datos_min.inc);
         inc_clean = sprintf('%.0f', inc_deg);
-        filenamePNG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
-        saveas(gcf, fullfile('figuras/kechichianJ2J3vsJ2J3', filenamePNG));
-        % filenameSVG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
-        % saveas(gcf, fullfile('figuras/kechichianJ2J3vsJ2J3', filenameSVG), 'svg');
+        filenamePNG = sprintf('r_a%s_i%s_kechichianJ3vsJ3.png', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ3vsJ3', filenamePNG));        
+        filenameSVG = sprintf('r_a%s_i%s_kechichianJ3vsJ3.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ3vsJ3', filenameSVG), 'svg');
+        close(gcf);
+
+
+        figure; hold on;
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_v_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_v_kechichian_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_v_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_v_kechichian_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
+        
+        % Configuración del gráfico
+        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_2 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
+        subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
+        title('Error de $||v(t)||$', 'Interpreter', 'latex');
+        xlabel('$t$ (s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
+        legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
+        xlim([min(datos_min.t), max(datos_min.t)]);
+        grid on; 
+        box off;
+        
+        % Guardar figura
+        a_clean = sprintf('%.0f', datos_min.a/1e3);
+        inc_deg = rad2deg(datos_min.inc);
+        inc_clean = sprintf('%.0f', inc_deg);
+        filenamePNG = sprintf('v_a%s_i%s_kechichianJ3vsJ3.png', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ3vsJ3', filenamePNG));        
+        filenameSVG = sprintf('v_a%s_i%s_kechichianJ3vsJ3.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/kechichianJ3vsJ3', filenameSVG), 'svg');
         close(gcf);
     end
 end
@@ -1069,9 +1243,16 @@ for ia = 1:num_a
         cowell_r_min     = [    datos_min.cowell_x_J2,     datos_min.cowell_y_J2,     datos_min.cowell_z_J2];
         analytical_r_min = [datos_min.analytical_x_J2, datos_min.analytical_y_J2, datos_min.analytical_z_J2];
         hodei_r_min      = [        datos_min.hodei_x,         datos_min.hodei_y,         datos_min.hodei_z];
+
+        cowell_v_min     = [    datos_min.cowell_dx_J2,     datos_min.cowell_dy_J2,     datos_min.cowell_dz_J2];
+        analytical_v_min = [datos_min.analytical_dx_J2, datos_min.analytical_dy_J2, datos_min.analytical_dz_J2];
+        hodei_v_min      = [        datos_min.hodei_dx,         datos_min.hodei_dy,         datos_min.hodei_dz];
         
-        error_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
-        error_hodei_min      = vecnorm(cowell_r_min -      hodei_r_min, 2, 2);
+        error_r_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
+        error_r_hodei_min      = vecnorm(cowell_r_min -      hodei_r_min, 2, 2);
+
+        error_v_analytical_min = vecnorm(cowell_v_min - analytical_v_min, 2, 2);
+        error_v_hodei_min      = vecnorm(cowell_v_min -      hodei_v_min, 2, 2);
         
         % Último valor de excentricidad (máximo)
         ie_max = num_e;
@@ -1081,17 +1262,24 @@ for ia = 1:num_a
         cowell_r_max     = [    datos_max.cowell_x_J2,     datos_max.cowell_y_J2,     datos_max.cowell_z_J2];
         analytical_r_max = [datos_max.analytical_x_J2, datos_max.analytical_y_J2, datos_max.analytical_z_J2];
         hodei_r_max      = [        datos_max.hodei_x,         datos_max.hodei_y,         datos_max.hodei_z];
+
+        cowell_v_max     = [    datos_max.cowell_dx_J2,     datos_max.cowell_dy_J2,     datos_max.cowell_dz_J2];
+        analytical_v_max = [datos_max.analytical_dx_J2, datos_max.analytical_dy_J2, datos_max.analytical_dz_J2];
+        hodei_v_max      = [        datos_max.hodei_dx,         datos_max.hodei_dy,         datos_max.hodei_dz];
         
-        error_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
-        error_hodei_max      = vecnorm(cowell_r_max -      hodei_r_max, 2, 2);
+        error_r_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
+        error_r_hodei_max      = vecnorm(cowell_r_max -      hodei_r_max, 2, 2);
+
+        error_v_analytical_max = vecnorm(cowell_v_max - analytical_v_max, 2, 2);
+        error_v_hodei_max      = vecnorm(cowell_v_max -      hodei_v_max, 2, 2);
         
         % Graficar (líneas discontinuas para primera excentricidad)
-        plot(datos_min.t, error_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
-        plot(datos_min.t,      error_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_r_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t,      error_r_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
         
         % Graficar (líneas continuas para última excentricidad)
-        plot(datos_max.t, error_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
-        plot(datos_max.t,      error_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_r_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t,      error_r_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
         
         hold off;
         
@@ -1118,10 +1306,43 @@ for ia = 1:num_a
         a_clean = sprintf('%.0f', datos_min.a/1e3);
         inc_deg = rad2deg(datos_min.inc);
         inc_clean = sprintf('%.0f', inc_deg);
-        filenamePNG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
+        filenamePNG = sprintf('r_a%s_i%s_hodeiJ2vsJ2.png', a_clean, inc_clean);
         saveas(gcf, fullfile('figuras/hodeiJ2vsJ2', filenamePNG));        
-        % filenameSVG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
-        % saveas(gcf, fullfile('figuras/hodeiJ2vsJ2', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_i%s_hodeiJ2vsJ2.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2vsJ2', filenameSVG), 'svg');
+        close(gcf);
+
+
+        figure; hold on;
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_v_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t,      error_v_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_v_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t,      error_v_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
+        
+        % Configuración del gráfico
+        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_3 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
+        subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
+        title('Error de $||v(t)||$', 'Interpreter', 'latex');
+        xlabel('$t$ (s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
+        legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
+        xlim([min(datos_min.t), max(datos_min.t)]);
+        grid on; 
+        box off;
+        
+        % Guardar figura
+        a_clean = sprintf('%.0f', datos_min.a/1e3);
+        inc_deg = rad2deg(datos_min.inc);
+        inc_clean = sprintf('%.0f', inc_deg);
+        filenamePNG = sprintf('v_a%s_i%s_hodeiJ2vsJ2.png', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2vsJ2', filenamePNG));        
+        filenameSVG = sprintf('v_a%s_i%s_hodeiJ2vsJ2.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2vsJ2', filenameSVG), 'svg');
         close(gcf);
     end
 end
@@ -1142,9 +1363,16 @@ for ia = 1:num_a
         cowell_r_min     = [    datos_min.cowell_x_J2J3,     datos_min.cowell_y_J2J3,     datos_min.cowell_z_J2J3];
         analytical_r_min = [datos_min.analytical_x_J2J3, datos_min.analytical_y_J2J3, datos_min.analytical_z_J2J3];
         hodei_r_min      = [          datos_min.hodei_x,           datos_min.hodei_y,           datos_min.hodei_z];
+
+        cowell_v_min     = [    datos_min.cowell_dx_J2J3,     datos_min.cowell_dy_J2J3,     datos_min.cowell_dz_J2J3];
+        analytical_v_min = [datos_min.analytical_dx_J2J3, datos_min.analytical_dy_J2J3, datos_min.analytical_dz_J2J3];
+        hodei_v_min      = [          datos_min.hodei_dx,           datos_min.hodei_dy,           datos_min.hodei_dz];
         
-        error_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
-        error_hodei_min      = vecnorm(cowell_r_min -      hodei_r_min, 2, 2);
+        error_r_analytical_min = vecnorm(cowell_r_min - analytical_r_min, 2, 2);
+        error_r_hodei_min      = vecnorm(cowell_r_min -      hodei_r_min, 2, 2);
+
+        error_v_analytical_min = vecnorm(cowell_v_min - analytical_v_min, 2, 2);
+        error_v_hodei_min      = vecnorm(cowell_v_min -      hodei_v_min, 2, 2);
         
         % Último valor de excentricidad (máximo)
         ie_max = num_e;
@@ -1154,17 +1382,24 @@ for ia = 1:num_a
         cowell_r_max     = [    datos_max.cowell_x_J2J3,     datos_max.cowell_y_J2J3,     datos_max.cowell_z_J2J3];
         analytical_r_max = [datos_max.analytical_x_J2J3, datos_max.analytical_y_J2J3, datos_max.analytical_z_J2J3];
         hodei_r_max      = [          datos_max.hodei_x,           datos_max.hodei_y,           datos_max.hodei_z];
+
+        cowell_v_max     = [    datos_max.cowell_dx_J2J3,     datos_max.cowell_dy_J2J3,     datos_max.cowell_dz_J2J3];
+        analytical_v_max = [datos_max.analytical_dx_J2J3, datos_max.analytical_dy_J2J3, datos_max.analytical_dz_J2J3];
+        hodei_v_max      = [          datos_max.hodei_dx,           datos_max.hodei_dy,           datos_max.hodei_dz];
         
-        error_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
-        error_hodei_max      = vecnorm(cowell_r_max -      hodei_r_max, 2, 2);
+        error_r_analytical_max = vecnorm(cowell_r_max - analytical_r_max, 2, 2);
+        error_r_hodei_max      = vecnorm(cowell_r_max -      hodei_r_max, 2, 2);
+
+        error_v_analytical_max = vecnorm(cowell_v_max - analytical_v_max, 2, 2);
+        error_v_hodei_max      = vecnorm(cowell_v_max -      hodei_v_max, 2, 2);
         
         % Graficar (líneas discontinuas para primera excentricidad)
-        plot(datos_min.t, error_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
-        plot(datos_min.t,      error_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        plot(datos_min.t, error_r_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t,      error_r_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
         
         % Graficar (líneas continuas para última excentricidad)
-        plot(datos_max.t, error_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
-        plot(datos_max.t,      error_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        plot(datos_max.t, error_r_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t,      error_r_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
         
         hold off;
         
@@ -1191,10 +1426,43 @@ for ia = 1:num_a
         a_clean = sprintf('%.0f', datos_min.a/1e3);
         inc_deg = rad2deg(datos_min.inc);
         inc_clean = sprintf('%.0f', inc_deg);
-        filenamePNG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
+        filenamePNG = sprintf('r_a%s_i%s_hodeiJ2J3vsJ2J3.png', a_clean, inc_clean);
         saveas(gcf, fullfile('figuras/hodeiJ2J3vsJ2J3', filenamePNG));      
-        % filenameSVG = sprintf('r_a%s_i%s.png', a_clean, inc_clean);
-        % saveas(gcf, fullfile('figuras/hodeiJ2J3vsJ2J3', filenameSVG), 'svg');
+        filenameSVG = sprintf('r_a%s_i%s_hodeiJ2J3vsJ2J3.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2J3vsJ2J3', filenameSVG), 'svg');
+        close(gcf);
+
+
+        figure; hold on;
+        % Graficar (líneas discontinuas para primera excentricidad)
+        plot(datos_min.t, error_v_analytical_min/1e3, '--', 'Color', color_analytical_min, 'LineWidth', 1.5);
+        plot(datos_min.t,      error_v_hodei_min/1e3, '--', 'Color', color_comparison_min, 'LineWidth', 1.5);
+        
+        % Graficar (líneas continuas para última excentricidad)
+        plot(datos_max.t, error_v_analytical_max/1e3, '-', 'Color', color_analytical_max, 'LineWidth', 1.5);
+        plot(datos_max.t,      error_v_hodei_max/1e3, '-', 'Color', color_comparison_max, 'LineWidth', 1.5);
+        
+        hold off;
+        
+        % Configuración del gráfico
+        subtitulo = sprintf('$a$ = %.0f km, $i$ = %.2f$^\\circ$, $J_3 = 0$', datos_min.a/1e3, rad2deg(datos_min.inc));
+        subtitle(subtitulo, 'Interpreter', 'latex', 'FontSize', 10);
+        title('Error de $||v(t)||$', 'Interpreter', 'latex');
+        xlabel('$t$ (s)', 'Interpreter', 'latex');
+        ylabel('Error de $||v(t)||$ (km/s)', 'Interpreter', 'latex');
+        legend(leyendas, 'Interpreter', 'latex', 'Location', 'best');
+        xlim([min(datos_min.t), max(datos_min.t)]);
+        grid on; 
+        box off;
+        
+        % Guardar figura
+        a_clean = sprintf('%.0f', datos_min.a/1e3);
+        inc_deg = rad2deg(datos_min.inc);
+        inc_clean = sprintf('%.0f', inc_deg);
+        filenamePNG = sprintf('v_a%s_i%s_hodeiJ2J3vsJ2J3.png', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2J3vsJ2J3', filenamePNG));        
+        filenameSVG = sprintf('v_a%s_i%s_hodeiJ2J3vsJ2J3.svg', a_clean, inc_clean);
+        saveas(gcf, fullfile('figuras/hodeiJ2J3vsJ2J3', filenameSVG), 'svg');
         close(gcf);
     end
 end
