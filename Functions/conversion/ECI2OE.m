@@ -65,6 +65,7 @@ function [SMA, ECC, INC, RAAN, AOP, TA, AOLon, AOLat] = ECI2OE(mu, r, v)
     end
 
     % 8. Calcular argumento de latitud y longitud
-    AOLat =   TA + AOP;
-    AOLon = RAAN + AOP;
+    AOLat = RAAN + AOP;
+    AOLon = atan2(r(:, 2), r(:, 1));
+
 end
