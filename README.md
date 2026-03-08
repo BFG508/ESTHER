@@ -30,9 +30,9 @@ Since this project is developed entirely in MATLAB, no external compilation or c
 1. **Clone the repository:**
    ```bash
    git clone [https://github.com/BFG508/ESTHER.git](https://github.com/BFG508/ESTHER.git)
-2. Open MATLAB and navigate to the cloned `ESTHER` directory.
-3. Add to Path: Ensure that all subdirectories (`/Functions`, `/zoomPlot`, etc.) are added to your MATLAB path so the main scripts can access the helper functions. You can do this by right-clicking the `ESTHER` folder in the Current Folder browser and selecting Add to Path > Selected Folders and Subfolders.
-4. Run the Analysis: Open and run the desired scripts within the `/Benito`, `/Kechichian`, or `/Clohessy–Wiltshire` folders to execute the analytical models or compare them with the numerical propagations. The scripts will automatically read the orbital parameters from `UCS_Satellite_Database.txt` when testing the different study cases.
+2. **Open MATLAB** and navigate to the cloned `ESTHER` directory.
+3. **Add to Path**: Ensure that all subdirectories (`/Functions`, `/zoomPlot`, etc.) are added to your MATLAB path so the main scripts can access the helper functions. You can do this by right-clicking the `ESTHER` folder in the Current Folder browser and selecting Add to Path > Selected Folders and Subfolders.
+4. **Run the Analysis**: Open and run the desired scripts within the `/Benito`, `/Kechichian`, or `/Clohessy–Wiltshire` folders to execute the analytical models or compare them with the numerical propagations. The scripts will automatically read the orbital parameters from `UCS_Satellite_Database.txt` when testing the different study cases.
 
 ## 🎓 Academic Context
 This repository contains the source code and mathematical tools developed for the Bachelor's Thesis (Trabajo de Fin de Grado) in Aerospace Engineering at Universidad Rey Juan Carlos (URJC), Spain.
@@ -41,4 +41,4 @@ This repository contains the source code and mathematical tools developed for th
 * Academic Year: 2024/2025
 
 ## 📜 License
-The documentation and associated thesis are distributed under the Creative Commons Attribution-ShareAlike 4.0 International license.
+The documentation and associated thesis are distributed under the [Creative Commons Attribution-ShareAlike 4.0 International license](https://creativecommons.org/licenses/by-sa/4.0/).
