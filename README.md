@@ -25,9 +25,9 @@ This project uses **MATLAB** (R2024b) alongside the **Symbolic Math Toolbox** to
 * `UCS_Satellite_Database.txt` - Real-world satellite orbital parameters used to define the 45 matrix study cases.
 
 ## ⚙️ Installation & Usage
-Since this project is developed entirely in MATLAB, no external compilation or complex dependency management is required. 
+Since this project is developed entirely in MATLAB, no external compilation or complex dependency management is required.
 
-1. **Clone the repository:**
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/BFG508/ESTHER.git
 2. **Open MATLAB** and navigate to the cloned `ESTHER` directory.
@@ -35,7 +35,7 @@ Since this project is developed entirely in MATLAB, no external compilation or c
 4. **Run the Analysis**: Open and run the desired scripts within the `/Benito`, `/Kechichian`, or `/Clohessy–Wiltshire` folders to execute the analytical models or compare them with the numerical propagations. The scripts will automatically read the orbital parameters from `UCS_Satellite_Database.txt` when testing the different study cases.
 
 ## 🎓 Academic Context
-This repository contains the source code and mathematical tools developed for the Bachelor's Thesis (Trabajo de Fin de Grado) in Aerospace Engineering at Universidad Rey Juan Carlos (URJC), Spain.
+This repository contains the source code and mathematical tools developed for my Bachelor's Thesis (*Trabajo de Fin de Grado*, TFG) in Aerospace Engineering at Universidad Rey Juan Carlos (URJC), Spain. The report is written in Spanish and is available **[here](https://hdl.handle.net/10115/374077)**.
 * Author: Benito Fernández González
 * Tutor: Hodei Urrutxua Cereijo
 * Academic Year: 2024/2025
